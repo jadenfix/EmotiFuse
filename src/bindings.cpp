@@ -27,4 +27,16 @@ PYBIND11_MODULE(emotifuse, m) {
              py::arg("sample_rate") = 16000, py::arg("n_mels") = 40, py::arg("n_mfcc") = 13)
         .def("extract", &FeatureExtractor::extract, py::arg("frames"))
         .def_property_readonly("feature_dim", &FeatureExtractor::featureDim);
+
+    // BranchONNX wrapper
+    py::class_<BranchONNX>(m, "BranchONNX")
+        .def(py::init<const std::string &>(), py::arg("model_path"))
+        .def("run", [](BranchONNX &b, py::array_t<float, py::array::c_style | py::array::forcecast> arr) {
+            std::vector<int64_t> shape(arr.ndim());
+            for (ssize_t i = 0; i < arr.ndim(); ++i) shape[i] = arr.shape(i);
+            std::vector<float> input(arr.size());
+            std::memcpy(input.data(), arr.data(), arr.nbytes());
+            auto out = b.run(shape, input);
+            return py::array(out.size(), out.data());
+        });
 } 
