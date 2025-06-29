@@ -1,6 +1,9 @@
 #pragma once
 
 #include <string>
+#include <memory>
+
+#include "BranchONNX.hpp"
 
 // Primary entry point to the C++ inference core.
 // This scaffold does *not* implement the full pipeline yet; it merely
@@ -18,4 +21,8 @@ public:
 
 private:
     std::string modelDir_;
+
+    std::unique_ptr<BranchONNX> wav2vecBranch_;
+    std::unique_ptr<BranchONNX> mlpBranch_;
+    std::unique_ptr<BranchONNX> specBranch_;
 }; 
