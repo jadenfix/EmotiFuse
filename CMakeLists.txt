@@ -5,8 +5,30 @@ project(emotifuse_cpp LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# Try to locate pybind11. If not found, the user must install it or add as submodule.
-find_package(pybind11 REQUIRED)
+# Try to locate pybind11:
+#   1. Prefer a system / Homebrew install (find_package CONFIG)
+#   2. Otherwise fall back to the path reported by the Python wheel
+#      (`python -m pybind11 --cmakedir`). This allows users who simply
+#      `pip install pybind11` to build the extension without any extra
+#      CMake arguments.
+
+if (NOT TARGET pybind11::pybind11)
+    find_package(pybind11 CONFIG QUIET)
+    if (NOT pybind11_FOUND)
+        message(STATUS "pybind11 not found via CMake; searching via Python wheel…")
+        execute_process(
+            COMMAND ${Python_EXECUTABLE} -m pybind11 --cmakedir
+            RESULT_VARIABLE _pybind11_status
+            OUTPUT_VARIABLE _pybind11_dir
+            OUTPUT_STRIP_TRAILING_WHITESPACE)
+        if (_pybind11_status EQUAL 0)
+            list(APPEND CMAKE_PREFIX_PATH "${_pybind11_dir}")
+            find_package(pybind11 CONFIG REQUIRED)
+        else()
+            message(FATAL_ERROR "pybind11 not found. Please install it (e.g. pip install pybind11) or set pybind11_DIR.")
+        endif()
+    endif()
+endif()
 
 # Try to locate ONNX Runtime. Users can set ONNXRUNTIME_DIR to custom path.
 find_package(onnxruntime REQUIRED)

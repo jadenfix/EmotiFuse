@@ -25,6 +25,9 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
+dependencies = [
+    "onnxruntime>=1.17",
+]
 
 [project.urls]
 Homepage = "https://github.com/yourname/emotifuse_cpp"
