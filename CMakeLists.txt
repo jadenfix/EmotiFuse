@@ -5,6 +5,9 @@ project(emotifuse_cpp LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+# Detect the current Python interpreter (needed for pybind11 wheel fallback)
+find_package(Python COMPONENTS Interpreter REQUIRED)
+
 # Try to locate pybind11:
 #   1. Prefer a system / Homebrew install (find_package CONFIG)
 #   2. Otherwise fall back to the path reported by the Python wheel
