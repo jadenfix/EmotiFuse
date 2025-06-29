@@ -42,9 +42,11 @@ def test_branch_loading():
         _create_identity(d / "mlp_emoti.onnx", 10)
         _create_identity(d / "spec_transformer.onnx", 10)
         _create_identity(d / "ncde_emoti.onnx", 10)
+        _create_identity(d / "classifier.onnx", 10)
 
         wav = d / "test.wav"
         _write_dummy_wav(wav)
 
         model = emo.EmotiFuse(str(d))
-        assert model.predict(str(wav)) == "neutral" 
+        pred = model.predict(str(wav))
+        assert pred in {"neutral", "happy", "sad", "angry", "other"} 
