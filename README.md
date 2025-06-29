@@ -29,7 +29,7 @@ graph LR
   C3 --> D
   D --> E[Neural CDE<br/>$begin:math:text$\\mathbf{z}(T)\\in\\mathbb{R}^{128}$end:math:text$]
   E --> F[Classifier → Softmax<br/>$begin:math:text$\\hat{\\mathbf{y}}\\in\\mathbb{R}^{C}$end:math:text$]
-
+```
 
 ⸻
 
