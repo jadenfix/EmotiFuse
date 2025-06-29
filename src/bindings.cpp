@@ -21,4 +21,10 @@ PYBIND11_MODULE(emotifuse, m) {
         .def("framing", &AudioIO::framing, py::arg("signal"), py::arg("frame_len") = 400, py::arg("hop") = 160)
         .def("frame_energy", &AudioIO::frameEnergy)
         .def("apply_vad", &AudioIO::applyVAD, py::arg("frames"), py::arg("db_threshold") = -40.0f);
+
+    py::class_<FeatureExtractor>(m, "FeatureExtractor")
+        .def(py::init<uint32_t, std::size_t, std::size_t>(),
+             py::arg("sample_rate") = 16000, py::arg("n_mels") = 40, py::arg("n_mfcc") = 13)
+        .def("extract", &FeatureExtractor::extract, py::arg("frames"))
+        .def_property_readonly("feature_dim", &FeatureExtractor::featureDim);
 } 
