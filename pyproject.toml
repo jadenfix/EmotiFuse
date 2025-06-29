@@ -1,0 +1,29 @@
+[tool.poetry]
+name = "emotifuse"
+version = "0.1.0"
+description = "Audio emotion recognition library using multi-branch fusion and neural CDEs"
+authors = ["Your Name <you@example.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{ include = "emotifuse" }]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+torch = "^2.2"
+torchaudio = "^2.2"
+transformers = "^4.41.0"
+librosa = "^0.10"
+torchcde = "^0.2"
+numpy = "^1.26"
+soundfile = "^0.12"
+scikit-learn = "^1.5"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0"
+black = "^24.4"
+flake8 = "^7.0"
+mypy = "^1.10"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api" 
