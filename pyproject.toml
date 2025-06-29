@@ -1,0 +1,34 @@
+[build-system]
+requires = [
+    "setuptools>=64",
+    "wheel",
+    "cmake>=3.15",
+    "pybind11>=2.11.0",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "emotifuse"
+version = "0.1.0"
+description = "EmotiFuse: C++-backed speech emotion recognition"
+readme = "README.md"
+authors = [
+    {name = "Your Name", email = "you@example.com"}
+]
+license = {text = "MIT"}
+requires-python = ">=3.8"
+keywords = ["speech", "emotion-recognition", "onnxruntime", "pybind11", "audio"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: C++",
+    "Topic :: Multimedia :: Sound/Audio :: Analysis",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourname/emotifuse_cpp"
+
+[tool.setuptools]
+packages = ["emotifuse"]
+include-package-data = true 
