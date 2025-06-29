@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "BranchONNX.hpp"
+#include "Fusion.hpp"
 
 // Primary entry point to the C++ inference core.
 // This scaffold does *not* implement the full pipeline yet; it merely
@@ -25,4 +26,7 @@ private:
     std::unique_ptr<BranchONNX> wav2vecBranch_;
     std::unique_ptr<BranchONNX> mlpBranch_;
     std::unique_ptr<BranchONNX> specBranch_;
+    std::unique_ptr<BranchONNX> ncdeBranch_;
+
+    Fusion fusion_{128}; // default dim 128; will adjust after probing branch outputs
 }; 

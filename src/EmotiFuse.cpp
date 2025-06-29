@@ -18,6 +18,7 @@ EmotiFuse::EmotiFuse(const std::string &model_dir) : modelDir_(model_dir) {
     wav2vecBranch_ = std::make_unique<BranchONNX>(check("wav2vec_emoti.onnx"));
     mlpBranch_     = std::make_unique<BranchONNX>(check("mlp_emoti.onnx"));
     specBranch_    = std::make_unique<BranchONNX>(check("spec_transformer.onnx"));
+    ncdeBranch_    = std::make_unique<BranchONNX>(check("ncde_emoti.onnx"));
 
     std::cout << "[EmotiFuse] Loaded branch models from " << model_dir << std::endl;
 }
@@ -28,7 +29,14 @@ std::string EmotiFuse::predict(const std::string &wav_path) const {
     try {
         AudioIO aio;
         auto signal = aio.loadWavMono(wav_path);
-        (void)signal; // unused for now
+        (void)signal;
+
+        // Dummy fused embedding (zeros) passed to NCDE branch to ensure end-to-end call.
+        const auto &outShape = ncdeBranch_->outputShape();
+        size_t H = outShape.size() >= 2 ? static_cast<size_t>(outShape.back()) : 64;
+        std::vector<float> fused(H, 0.0f);
+        auto ncdeOut = ncdeBranch_->run({1, static_cast<int64_t>(H)}, fused);
+        (void)ncdeOut;
     } catch (const std::exception &e) {
         std::cerr << "AudioIO error: " << e.what() << std::endl;
     }
