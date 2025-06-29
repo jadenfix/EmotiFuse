@@ -28,6 +28,12 @@ PYBIND11_MODULE(emotifuse, m) {
         .def("extract", &FeatureExtractor::extract, py::arg("frames"))
         .def_property_readonly("feature_dim", &FeatureExtractor::featureDim);
 
+    // Fusion bindings
+    py::class_<Fusion>(m, "Fusion")
+        .def(py::init<std::size_t, unsigned>(), py::arg("dim"), py::arg("seed") = 42)
+        .def("fuse", &Fusion::fuse, py::arg("e1"), py::arg("e2"), py::arg("e3"))
+        .def_property_readonly("last_gates", &Fusion::lastGates);
+
     // BranchONNX wrapper
     py::class_<BranchONNX>(m, "BranchONNX")
         .def(py::init<const std::string &>(), py::arg("model_path"))
