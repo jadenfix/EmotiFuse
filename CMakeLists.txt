@@ -33,8 +33,41 @@ if (NOT TARGET pybind11::pybind11)
     endif()
 endif()
 
-# Try to locate ONNX Runtime. Users can set ONNXRUNTIME_DIR to custom path.
-find_package(onnxruntime REQUIRED)
+# Try to locate ONNX Runtime
+find_package(onnxruntime CONFIG QUIET)
+
+if (NOT onnxruntime_FOUND)
+    message(STATUS "onnxruntimeConfig.cmake not found – trying wheel location")
+    execute_process(
+        COMMAND ${Python_EXECUTABLE} - <<PY
+import importlib, sys, pathlib, json, os
+try:
+    import onnxruntime as ort
+except ImportError:
+    sys.exit(1)
+wheel_dir = pathlib.Path(ort.__file__).parent
+inc = wheel_dir / "include"
+lib = wheel_dir
+print(json.dumps({"inc": str(inc), "lib": str(lib)}))
+PY
+        RESULT_VARIABLE _ort_status
+        OUTPUT_VARIABLE _ort_json
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+    if (_ort_status EQUAL 0)
+        file(WRITE ${CMAKE_BINARY_DIR}/ort.json "${_ort_json}")
+        file(READ ${CMAKE_BINARY_DIR}/ort.json _ort_content)
+        string(JSON _ort_inc GET ${_ort_content} inc)
+        string(JSON _ort_libdir GET ${_ort_content} lib)
+        message(STATUS "Using ORT wheel include at ${_ort_inc}")
+        add_library(onnxruntime SHARED IMPORTED)
+        set_target_properties(onnxruntime PROPERTIES
+            IMPORTED_LOCATION "${_ort_libdir}/libonnxruntime.dylib")
+        target_include_directories(onnxruntime INTERFACE "${_ort_inc}")
+    else()
+        message(FATAL_ERROR "ONNX Runtime not found. Install the SDK or the Python wheel.")
+    endif()
+endif()
 
 # Include public headers
 include_directories(include)
