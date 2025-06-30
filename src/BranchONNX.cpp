@@ -2,6 +2,7 @@
 #include "BranchONNX.hpp"
 
 #include <stdexcept>
+#include <array>
 
 namespace {
 // Shared environment for all sessions (singleton pattern)
@@ -40,14 +41,17 @@ std::vector<float> BranchONNX::run(const std::vector<int64_t> &inputShape,
     Ort::Value inputTensor = Ort::Value::CreateTensor<float>(
         memInfo, const_cast<float *>(input.data()), input.size(), inputShape.data(), inputShape.size());
 
-    // Get IO names
-    const char *inputName = session_.GetInputName(0, allocator_);
-    const char *outputName = session_.GetOutputName(0, allocator_);
+    // Get IO names (allocator returns managed strings in >=1.22)
+    Ort::AllocatedStringPtr inputNamePtr  = session_.GetInputNameAllocated(0, allocator_);
+    Ort::AllocatedStringPtr outputNamePtr = session_.GetOutputNameAllocated(0, allocator_);
+
+    std::array<const char *, 1> inputNames  = {inputNamePtr.get()};
+    std::array<const char *, 1> outputNames = {outputNamePtr.get()};
 
     // Run inference
-    auto outputTensor = session_.Run(Ort::RunOptions{nullptr},
-                                     &inputName, &inputTensor, 1,
-                                     &outputName, 1);
+    auto outputTensor = session_.Run(Ort::RunOptions{},
+                                     inputNames.data(), &inputTensor, 1,
+                                     outputNames.data(), 1);
 
     float *outPtr = outputTensor[0].GetTensorMutableData<float>();
     auto typeInfo = outputTensor[0].GetTensorTypeAndShapeInfo();
