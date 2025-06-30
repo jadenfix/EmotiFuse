@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Detect the current Python interpreter (needed for pybind11 wheel fallback)
-find_package(Python COMPONENTS Interpreter REQUIRED)
+find_package(Python COMPONENTS Interpreter Development REQUIRED)
 
 # Try to locate pybind11:
 #   1. Prefer a system / Homebrew install (find_package CONFIG)
