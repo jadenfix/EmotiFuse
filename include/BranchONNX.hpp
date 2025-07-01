@@ -15,9 +15,13 @@ public:
                            const std::vector<float> &input) const;
 
     std::vector<int64_t> outputShape() const { return outputShape_; }
+    
+    // Get the actual output shape from the last run() call
+    std::vector<int64_t> lastOutputShape() const { return lastOutputShape_; }
 
 private:
     Ort::Session session_{nullptr};
     Ort::AllocatorWithDefaultOptions allocator_;
     std::vector<int64_t> outputShape_;
+    mutable std::vector<int64_t> lastOutputShape_;  // mutable so it can be modified in const run()
 }; 

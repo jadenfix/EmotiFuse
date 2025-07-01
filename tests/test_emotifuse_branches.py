@@ -19,7 +19,8 @@ def _create_identity(path: Path, dim):
     Y = helper.make_tensor_value_info("y", TensorProto.FLOAT, [None, dim])
     node = helper.make_node("Identity", ["x"], ["y"])
     graph = helper.make_graph([node], "g", [X], [Y])
-    model = helper.make_model(graph)
+    model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 15)])
+    model.ir_version = 10  # Use compatible IR version with current ONNX Runtime
     onnx.save(model, str(path))
 
 
@@ -38,11 +39,12 @@ def test_branch_loading():
 
     with tempfile.TemporaryDirectory() as tmpdir:
         d = Path(tmpdir)
-        _create_identity(d / "wav2vec_emoti.onnx", 10)
-        _create_identity(d / "mlp_emoti.onnx", 10)
-        _create_identity(d / "spec_transformer.onnx", 10)
-        _create_identity(d / "ncde_emoti.onnx", 10)
-        _create_identity(d / "classifier.onnx", 10)
+        # The FeatureExtractor outputs n_mfcc * 3 = 13 * 3 = 39 features by default
+        _create_identity(d / "wav2vec_emoti.onnx", 39)
+        _create_identity(d / "mlp_emoti.onnx", 39)
+        _create_identity(d / "spec_transformer.onnx", 39)
+        _create_identity(d / "ncde_emoti.onnx", 39)
+        _create_identity(d / "classifier.onnx", 39)
 
         wav = d / "test.wav"
         _write_dummy_wav(wav)

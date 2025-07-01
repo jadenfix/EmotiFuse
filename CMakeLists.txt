@@ -39,17 +39,17 @@ find_package(onnxruntime CONFIG QUIET)
 if (NOT onnxruntime_FOUND)
     message(STATUS "onnxruntimeConfig.cmake not found – trying wheel location")
     execute_process(
-        COMMAND ${Python_EXECUTABLE} - <<PY
+        COMMAND ${Python_EXECUTABLE} -c "
 import importlib, sys, pathlib, json, os
 try:
     import onnxruntime as ort
 except ImportError:
     sys.exit(1)
 wheel_dir = pathlib.Path(ort.__file__).parent
-inc = wheel_dir / "include"
+inc = wheel_dir / 'include'
 lib = wheel_dir
-print(json.dumps({"inc": str(inc), "lib": str(lib)}))
-PY
+print(json.dumps({'inc': str(inc), 'lib': str(lib)}))
+"
         RESULT_VARIABLE _ort_status
         OUTPUT_VARIABLE _ort_json
         OUTPUT_STRIP_TRAILING_WHITESPACE)

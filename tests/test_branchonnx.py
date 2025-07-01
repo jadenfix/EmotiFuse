@@ -17,7 +17,8 @@ def _create_identity_model(path: Path, dim: int = 4):
     Y = helper.make_tensor_value_info("output", TensorProto.FLOAT, [None, dim])
     node = helper.make_node("Identity", ["input"], ["output"])
     graph = helper.make_graph([node], "ident_graph", [X], [Y])
-    model = helper.make_model(graph, producer_name="test")
+    model = helper.make_model(graph, producer_name="test", opset_imports=[helper.make_opsetid("", 15)])
+    model.ir_version = 10  # Use compatible IR version with current ONNX Runtime
     onnx.save(model, str(path))
 
 

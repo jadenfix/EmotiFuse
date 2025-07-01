@@ -1,6 +1,11 @@
 #include <pybind11/pybind11.h>
+#include <pybind11/numpy.h>
+#include <pybind11/stl.h>
 #include "EmotiFuse.hpp"
 #include "AudioIO.hpp"
+#include "FeatureExtractor.hpp"
+#include "Fusion.hpp"
+#include "BranchONNX.hpp"
 
 namespace py = pybind11;
 
@@ -13,7 +18,7 @@ PYBIND11_MODULE(emotifuse, m) {
 
     py::class_<AudioIO::FrameBuffer>(m, "FrameBuffer")
         .def_property_readonly("frames", [](const AudioIO::FrameBuffer &fb) { return fb.numFrames(); })
-        .def_property_readonly("frame_length", &AudioIO::FrameBuffer::frameLength);
+        .def_readonly("frame_length", &AudioIO::FrameBuffer::frameLength);
 
     py::class_<AudioIO>(m, "AudioIO")
         .def(py::init<uint32_t, float>(), py::arg("target_sr") = 16000, py::arg("pre_emph") = 0.97f)
@@ -43,6 +48,10 @@ PYBIND11_MODULE(emotifuse, m) {
             std::vector<float> input(arr.size());
             std::memcpy(input.data(), arr.data(), arr.nbytes());
             auto out = b.run(shape, input);
-            return py::array(out.size(), out.data());
+            
+            // Get the actual output shape from the last run
+            auto actualOutputShape = b.lastOutputShape();
+            std::vector<ssize_t> pyShape(actualOutputShape.begin(), actualOutputShape.end());
+            return py::array_t<float>(pyShape, out.data());
         });
 } 

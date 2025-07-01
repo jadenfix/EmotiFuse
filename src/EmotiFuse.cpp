@@ -34,21 +34,39 @@ std::string EmotiFuse::predict(const std::string &wav_path) const {
 
         // Classic features for mlp branch
         auto feats = featExtr_.extract(frames);
-        std::vector<float> mlpOut = mlpBranch_->run({static_cast<int64_t>(frames.numFrames()), static_cast<int64_t>(featExtr_.featureDim())}, feats);
+        size_t featDim = featExtr_.featureDim();
+        
+        // MLP branch outputs [numFrames, featDim], but we need [1, featDim] for fusion
+        // So we reshape the input to just one frame worth of features (take the mean)
+        size_t numFrames = frames.numFrames();
+        std::vector<float> meanFeats(featDim, 0.0f);
+        for (size_t i = 0; i < numFrames; ++i) {
+            for (size_t j = 0; j < featDim; ++j) {
+                meanFeats[j] += feats[i * featDim + j];
+            }
+        }
+        for (size_t j = 0; j < featDim; ++j) {
+            meanFeats[j] /= numFrames;
+        }
+        
+        std::vector<float> mlpOut = mlpBranch_->run({1, static_cast<int64_t>(featDim)}, meanFeats);
 
         // Wav2vec & spec transformer branches – dummy zeros (identity models in tests)
-        std::vector<float> wvOut = wav2vecBranch_->run({1, 10}, std::vector<float>(10, 0.0f));
-        std::vector<float> specOut = specBranch_->run({1, 10}, std::vector<float>(10, 0.0f));
+        std::vector<float> wvOut = wav2vecBranch_->run({1, static_cast<int64_t>(featDim)}, std::vector<float>(featDim, 0.0f));
+        std::vector<float> specOut = specBranch_->run({1, static_cast<int64_t>(featDim)}, std::vector<float>(featDim, 0.0f));
 
-        // Fuse (assumes same dim 10)
-        fusion_ = Fusion(10);
+        // All outputs should now have size featDim
+        std::cout << "[EmotiFuse] mlpOut size: " << mlpOut.size() << ", wvOut size: " << wvOut.size() << ", specOut size: " << specOut.size() << std::endl;
+
+        // Fuse (use feature dimension)
+        fusion_ = Fusion(featDim);
         auto fused = fusion_.fuse(wvOut, mlpOut, specOut);
 
         // NCDE (identity in tests)
-        auto ncdeOut = ncdeBranch_->run({1, 10}, fused);
+        auto ncdeOut = ncdeBranch_->run({1, static_cast<int64_t>(featDim)}, fused);
 
         // Classifier (identity) -> logits
-        auto logits = classifierBranch_->run({1, 10}, ncdeOut);
+        auto logits = classifierBranch_->run({1, static_cast<int64_t>(featDim)}, ncdeOut);
         // Pick max index as label (stub mapping)
         size_t best = 0;
         for (size_t i = 1; i < logits.size(); ++i) if (logits[i] > logits[best]) best = i;

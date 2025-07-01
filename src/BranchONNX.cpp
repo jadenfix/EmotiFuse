@@ -48,15 +48,19 @@ std::vector<float> BranchONNX::run(const std::vector<int64_t> &inputShape,
     std::array<const char *, 1> inputNames  = {inputNamePtr.get()};
     std::array<const char *, 1> outputNames = {outputNamePtr.get()};
 
-    // Run inference
-    auto outputTensor = session_.Run(Ort::RunOptions{},
-                                     inputNames.data(), &inputTensor, 1,
-                                     outputNames.data(), 1);
+    // Run inference - create non-const copy to call Run
+    Ort::Session& mutableSession = const_cast<Ort::Session&>(session_);
+    auto outputTensors = mutableSession.Run(Ort::RunOptions{nullptr},
+                                           inputNames.data(), &inputTensor, 1,
+                                           outputNames.data(), 1);
 
-    float *outPtr = outputTensor[0].GetTensorMutableData<float>();
-    auto typeInfo = outputTensor[0].GetTensorTypeAndShapeInfo();
+    float *outPtr = outputTensors[0].GetTensorMutableData<float>();
+    auto typeInfo = outputTensors[0].GetTensorTypeAndShapeInfo();
     std::vector<int64_t> outShape = typeInfo.GetShape();
     size_t outSize = typeInfo.GetElementCount();
+
+    // Store the actual output shape for later access
+    lastOutputShape_ = outShape;
 
     return std::vector<float>(outPtr, outPtr + outSize);
 } 
