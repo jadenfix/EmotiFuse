@@ -15,8 +15,15 @@ except _metadata.PackageNotFoundError:  # pragma: no cover
 del _metadata
 
 # Public API ------------------------------------------------------------------
-from .model import EmotiFuse  # noqa: E402 F401  (import after __version__)
-from .infer import infer  # noqa: E402 F401
+def __getattr__(name):
+    # Audio utilities do not require loading the model or its encoder stack.
+    if name == "EmotiFuse":
+        from .model import EmotiFuse
+        return EmotiFuse
+    if name == "infer":
+        from .infer import infer
+        return infer
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 __all__ = [
     "__version__",

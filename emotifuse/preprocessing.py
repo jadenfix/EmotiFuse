@@ -48,7 +48,7 @@ def resample_mono(wav: torch.Tensor, orig_sr: int, target_sr: int = 16_000) -> T
         ``(mono_wav, target_sr)`` where *mono_wav* is a 1-D tensor.
     """
 
-    if wav.ndim == 2 and wav.size(0) > 1:
+    if wav.ndim == 2 and wav.size(0) >= 1:
         wav = torch.mean(wav, dim=0)  # naive down-mix to mono
     elif wav.ndim == 1:
         pass  # already mono
@@ -96,6 +96,14 @@ def voice_activity_detection(wav: torch.Tensor, threshold_db: float = -40.0, fra
     if wav.ndim != 1:
         raise ValueError("voice_activity_detection expects a 1-D mono signal")
 
+    if frame_length <= 0 or hop_length <= 0:
+        raise ValueError("frame_length and hop_length must be positive")
+    if wav.numel() == 0:
+        return wav
+    if wav.numel() < frame_length:
+        rms_db = 20 * torch.log10(torch.sqrt(torch.mean(wav ** 2) + 1e-10))
+        return wav if rms_db > threshold_db else wav[:0]
+
     # Compute frame-wise RMS (energy)
     frames = wav.unfold(0, frame_length, hop_length)  # shape: (n_frames, frame_length)
     rms = torch.sqrt(torch.mean(frames ** 2, dim=1) + 1e-10)
@@ -104,10 +112,11 @@ def voice_activity_detection(wav: torch.Tensor, threshold_db: float = -40.0, fra
     # Determine voiced frames
     voiced = rms_db > threshold_db
     if not voiced.any():
-        return torch.zeros(0)
+        return wav[:0]
 
-    start_frame = voiced.argmax().item()
-    end_frame = len(voiced) - voiced.flip(0).argmax().item()  # last True
+    voiced_indices = torch.nonzero(voiced, as_tuple=False).flatten()
+    start_frame = int(voiced_indices[0])
+    end_frame = int(voiced_indices[-1])
 
     start_sample = start_frame * hop_length
     end_sample = min(end_frame * hop_length + frame_length, wav.size(0))
