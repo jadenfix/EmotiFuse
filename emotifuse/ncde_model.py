@@ -51,10 +51,14 @@ class EmotiCDE(nn.Module):
             Final hidden state ``(B, hidden_dim)``.
         """
 
+        if h.ndim != 3 or h.size(1) < 1:
+            raise ValueError("CDE input must be a nonempty (B, T, D) sequence")
+        if h.size(1) == 1:
+            return self.initial_linear(h[:, 0])
         if times is None:
             times = torch.linspace(0, h.size(1) - 1, h.size(1), device=h.device)
 
         X = torchcde.LinearInterpolation(h, t=times)
         z0 = self.initial_linear(h[:, 0])
-        z_T = torchcde.cdeint(X=X, func=self.func, z0=z0, t=times, method="rk4")
+        z_T = torchcde.cdeint(X=X, func=self.func, z0=z0, t=times, method="rk4", adjoint=False)
         return z_T[:, -1]  # final state 

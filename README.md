@@ -138,3 +138,22 @@ License
 
 MIT © Jaden Fix
 
+
+## Verified download-free model smoke
+
+```sh
+python -m emotifuse.smoke --output artifacts/smoke.json
+python -m pytest -q tests
+```
+
+The smoke uses a synthetic sine wave and a tiny **randomly initialized**
+Wav2Vec2 encoder. It executes acoustic feature extraction, the spectrogram
+Transformer, aligned fusion, the neural CDE, and a backward pass on CPU. It
+checks tensor shapes and finite gradients; it does not measure recognition
+accuracy or produce a meaningful emotion prediction.
+
+`infer(wav_path, checkpoint=...)` requires a trained EmotiFuse checkpoint. This
+repository does not bundle trained emotion-classification weights. The default
+full model also needs the pretrained `facebook/wav2vec2-base` encoder available
+locally or via Hugging Face. Previously created checkpoints may need retraining
+after corrections to spectrogram processing and CDE gradient flow.

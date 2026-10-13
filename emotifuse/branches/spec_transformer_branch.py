@@ -36,24 +36,21 @@ class SpecTransformerBranch(nn.Module):
         Returns output embeddings per frame ``(B, T, embed_dim)``.
         """
 
+        if spec.ndim != 3 or min(spec.shape) < 1:
+            raise ValueError("spectrogram must have shape (B, F, T) with nonempty axes")
         B, F, T = spec.shape
-        if F % self.patch_size != 0:
-            raise ValueError("Frequency bins must be divisible by patch_size")
+        # Project each frequency patch, then aggregate patches per time frame.
+        padding = (-F) % self.patch_size
+        spec = nn.functional.pad(spec, (0, 0, 0, padding))
+        n_patches = spec.size(1) // self.patch_size
+        x = spec.reshape(B, n_patches, self.patch_size, T).permute(0, 3, 1, 2)
+        x = self.proj(x).mean(dim=2)
 
-        # Reshape into patches along frequency: (B, T, n_patches, patch_size)
-        n_patches = F // self.patch_size
-        x = spec.view(B, n_patches, self.patch_size, T)  # (B, n_patches, patch_size, T)
-        x = x.permute(0, 3, 1, 2)  # (B, T, n_patches, patch_size)
-        x = x.flatten(2)  # (B, T, n_patches * patch_size)
-
-        # Project
-        x = self.proj(x)  # (B, T, embed_dim)
-
-        # Positional encoding (learned)
-        pos = torch.arange(T, device=x.device).unsqueeze(0)
-        pos_embed = nn.functional.embedding(pos, torch.eye(T, device=x.device, dtype=x.dtype))
-        pos_embed = pos_embed.expand(B, -1, -1)  # (B, T, T)
-        x = x + pos_embed[..., : self.embed_dim]
-
-        x = self.encoder(x)
-        return x 
+        # Sinusoidal time positions use O(T * D) memory and work at any length.
+        positions = torch.arange(T, device=x.device, dtype=x.dtype).unsqueeze(1)
+        frequencies = torch.exp(torch.arange(0, self.embed_dim, 2, device=x.device,
+                                              dtype=x.dtype) * (-torch.log(x.new_tensor(10000.0)) / self.embed_dim))
+        encoding = x.new_zeros(T, self.embed_dim)
+        encoding[:, 0::2] = torch.sin(positions * frequencies)
+        encoding[:, 1::2] = torch.cos(positions * frequencies[:self.embed_dim // 2])
+        return self.encoder(x + encoding.unsqueeze(0))
