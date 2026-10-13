@@ -29,10 +29,11 @@ def _load_model(checkpoint: str | None = None) -> EmotiFuse:  # pragma: no cover
         raise ValueError("A trained EmotiFuse checkpoint is required for emotion prediction")
     resolved = str(Path(checkpoint).resolve())
     if _model is None or _checkpoint != resolved:
-        _model = EmotiFuse().to(_device).eval()
+        # Publish a new cache entry only after the checkpoint loads completely.
         state = torch.load(resolved, map_location=_device, weights_only=True)
-        _model.load_state_dict(state)
-        _checkpoint = resolved
+        candidate = EmotiFuse().to(_device).eval()
+        candidate.load_state_dict(state)
+        _model, _checkpoint = candidate, resolved
     return _model
 
 

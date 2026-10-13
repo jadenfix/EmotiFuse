@@ -1,4 +1,5 @@
 import importlib
+from pathlib import Path
 import numpy as np
 import pytest
 import soundfile as sf
@@ -81,3 +82,39 @@ def test_cde_late_control_frames_receive_training_gradients():
     model(control).sum().backward()
     assert control.grad[:, 1:].abs().sum() > 0
     assert torch.isfinite(control.grad).all()
+
+
+@pytest.mark.parametrize("failure", ["read", "state"])
+def test_failed_checkpoint_switch_preserves_cached_model(tmp_path, monkeypatch, failure):
+    module = importlib.import_module("emotifuse.infer")
+    monkeypatch.setattr(module, "_model", None)
+    monkeypatch.setattr(module, "_checkpoint", None)
+    created = []
+    class FakeModel:
+        def __init__(self):
+            self.state = None
+            created.append(self)
+        def to(self, device):
+            return self
+        def eval(self):
+            return self
+        def load_state_dict(self, state):
+            if state["checkpoint"] == "b.pt":
+                raise RuntimeError("incompatible checkpoint")
+            self.state = state
+    def load(path, **kwargs):
+        name = Path(path).name
+        if name == "b.pt" and failure == "read":
+            raise OSError("unreadable checkpoint")
+        return {"checkpoint": name}
+    monkeypatch.setattr(module, "EmotiFuse", FakeModel)
+    monkeypatch.setattr(module.torch, "load", load)
+    a = tmp_path / "a.pt"
+    b = tmp_path / "b.pt"
+    original = module._load_model(str(a))
+    with pytest.raises((OSError, RuntimeError)):
+        module._load_model(str(b))
+    assert module._load_model(str(a)) is original
+    assert module._model is original
+    assert module._checkpoint == str(a.resolve())
+    assert original.state == {"checkpoint": "a.pt"}
