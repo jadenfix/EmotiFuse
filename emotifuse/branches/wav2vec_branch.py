@@ -25,9 +25,9 @@ def _load_pretrained(name_or_path: str, output_hidden_states: bool = True) -> Wa
 class Wav2VecBranch(nn.Module):
     """Return frame-level embeddings from a frozen (or trainable) Wav2Vec model."""
 
-    def __init__(self, model_name: str = "facebook/wav2vec2-base", trainable: bool = False, proj_dim: Optional[int] = None):
+    def __init__(self, model_name: str = "facebook/wav2vec2-base", trainable: bool = False, proj_dim: Optional[int] = None, encoder: Optional[nn.Module] = None):
         super().__init__()
-        self.wav2vec = _load_pretrained(model_name)
+        self.wav2vec = encoder if encoder is not None else _load_pretrained(model_name)
         self.trainable = trainable
         for p in self.wav2vec.parameters():
             p.requires_grad = trainable

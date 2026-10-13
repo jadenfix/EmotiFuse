@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import soundfile as sf
 import torch
+import torchaudio
 
 from .model import EmotiFuse
 from .preprocessing import resample_mono, pre_emphasis, voice_activity_detection
@@ -18,24 +19,33 @@ __all__ = [
 ]
 
 _model: EmotiFuse | None = None
+_checkpoint: str | None = None
 _device = get_default_device()
 
 
 def _load_model(checkpoint: str | None = None) -> EmotiFuse:  # pragma: no cover
-    global _model
-    if _model is None:
-        _model = EmotiFuse().to(_device).eval()
-        if checkpoint is not None:
-            state = torch.load(checkpoint, map_location=_device)
-            _model.load_state_dict(state)
+    global _model, _checkpoint
+    if checkpoint is None:
+        raise ValueError("A trained EmotiFuse checkpoint is required for emotion prediction")
+    resolved = str(Path(checkpoint).resolve())
+    if _model is None or _checkpoint != resolved:
+        # Publish a new cache entry only after the checkpoint loads completely.
+        state = torch.load(resolved, map_location=_device, weights_only=True)
+        candidate = EmotiFuse().to(_device).eval()
+        candidate.load_state_dict(state)
+        _model, _checkpoint = candidate, resolved
     return _model
 
 
 def infer(wav_path: str | Path, checkpoint: str | None = None) -> str:  # noqa: D401
     """Return predicted emotion label for *wav_path*."""
 
+    if checkpoint is None:
+        raise ValueError("A trained EmotiFuse checkpoint is required for emotion prediction")
     wav, sr = sf.read(str(wav_path))
     wav = torch.tensor(wav).float()
+    if wav.ndim == 2:
+        wav = wav.transpose(0, 1)  # soundfile returns (time, channels)
 
     wav, _ = resample_mono(wav, sr, 16_000)
     wav = pre_emphasis(wav)
@@ -48,17 +58,13 @@ def infer(wav_path: str | Path, checkpoint: str | None = None) -> str:  # noqa: 
 
     # Classical features using NumPy API
     feats = _features.extract_features(wav.cpu().numpy(), 16_000)
-    feats = {k: torch.tensor(v).unsqueeze(0).to(device).float().transpose(1, 2) for k, v in feats.items()}
+    feats = {k: torch.tensor(feats[k]).transpose(0, 1).unsqueeze(0).to(device).float()
+             for k in ("mfcc", "delta", "delta2")}
 
     # Spectrogram
-    spec = torch.log1p(torch.stft(
-        wav,
-        n_fft=400,
-        hop_length=160,
-        window=torch.hann_window(400, device=device),
-        return_complex=True,
-    ).abs() ** 2)
-    spec = spec.unsqueeze(0)  # (1, F, T)
+    mel = torchaudio.transforms.MelSpectrogram(sample_rate=16_000, n_fft=400,
+                                              hop_length=160, n_mels=64).to(device)
+    spec = torch.log1p(mel(wav)).unsqueeze(0)
 
     model = _load_model(checkpoint)
     with torch.no_grad():

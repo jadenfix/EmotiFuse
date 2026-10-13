@@ -34,8 +34,13 @@ def extract_features(wav: np.ndarray, sr: int, n_mfcc: int = 13) -> Dict[str, np
 
     # MFCCs
     mfcc = librosa.feature.mfcc(y=wav, sr=sr, n_mfcc=n_mfcc)
-    delta = librosa.feature.delta(mfcc)
-    delta2 = librosa.feature.delta(mfcc, order=2)
+    width = min(9, mfcc.shape[1] if mfcc.shape[1] % 2 else mfcc.shape[1] - 1)
+    if width < 3:
+        delta = np.zeros_like(mfcc)
+        delta2 = np.zeros_like(mfcc)
+    else:
+        delta = librosa.feature.delta(mfcc, width=width)
+        delta2 = librosa.feature.delta(mfcc, order=2, width=width)
 
     # Pitch using autocorrelation (pyin more robust but slower)
     pitches, _ = librosa.piptrack(y=wav, sr=sr)

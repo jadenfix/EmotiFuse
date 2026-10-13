@@ -48,7 +48,10 @@ def resample_mono(wav: torch.Tensor, orig_sr: int, target_sr: int = 16_000) -> T
         ``(mono_wav, target_sr)`` where *mono_wav* is a 1-D tensor.
     """
 
-    if wav.ndim == 2 and wav.size(0) > 1:
+    wav = torch.as_tensor(wav)
+    if orig_sr <= 0 or target_sr <= 0:
+        raise ValueError("sampling rates must be positive")
+    if wav.ndim == 2 and wav.size(0) >= 1:
         wav = torch.mean(wav, dim=0)  # naive down-mix to mono
     elif wav.ndim == 1:
         pass  # already mono
@@ -96,18 +99,26 @@ def voice_activity_detection(wav: torch.Tensor, threshold_db: float = -40.0, fra
     if wav.ndim != 1:
         raise ValueError("voice_activity_detection expects a 1-D mono signal")
 
-    # Compute frame-wise RMS (energy)
-    frames = wav.unfold(0, frame_length, hop_length)  # shape: (n_frames, frame_length)
+    if frame_length <= 0 or not 0 < hop_length <= frame_length:
+        raise ValueError("require 0 < hop_length <= frame_length")
+    if wav.numel() == 0:
+        return wav
+    # Include partial trailing frames, even for clips shorter than one frame.
+    n_frames = max(1, (max(0, wav.numel() - frame_length) + hop_length - 1) // hop_length + 1)
+    padded_length = (n_frames - 1) * hop_length + frame_length
+    padded = torch.nn.functional.pad(wav, (0, padded_length - wav.numel()))
+    frames = padded.unfold(0, frame_length, hop_length)  # shape: (n_frames, frame_length)
     rms = torch.sqrt(torch.mean(frames ** 2, dim=1) + 1e-10)
     rms_db = 20 * torch.log10(rms)
 
     # Determine voiced frames
     voiced = rms_db > threshold_db
     if not voiced.any():
-        return torch.zeros(0)
+        return wav[:0]
 
-    start_frame = voiced.argmax().item()
-    end_frame = len(voiced) - voiced.flip(0).argmax().item()  # last True
+    indices = torch.nonzero(voiced, as_tuple=False).flatten()
+    start_frame = indices[0].item()
+    end_frame = indices[-1].item()
 
     start_sample = start_frame * hop_length
     end_sample = min(end_frame * hop_length + frame_length, wav.size(0))

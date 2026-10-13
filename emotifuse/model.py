@@ -17,9 +17,9 @@ __all__ = [
 class EmotiFuse(nn.Module):
     """Full multi-branch model as described in the design doc."""
 
-    def __init__(self, emb_dim: int = 256, hidden_dim: int = 512, n_classes: int = 8):
+    def __init__(self, emb_dim: int = 256, hidden_dim: int = 512, n_classes: int = 8, speech_encoder: nn.Module | None = None):
         super().__init__()
-        self.wav2vec = Wav2VecBranch(proj_dim=emb_dim)
+        self.wav2vec = Wav2VecBranch(proj_dim=emb_dim, encoder=speech_encoder)
         self.classical = ClassicalBranch(emb_dim=emb_dim)
         self.spect = SpecTransformerBranch(embed_dim=emb_dim)
 
@@ -49,7 +49,15 @@ class EmotiFuse(nn.Module):
         m = self.classical(feats)
         s = self.spect(specs)
 
-        h = self.fusion(e, m, s)
+        # Encoder strides differ across audio, MFCCs, and spectrograms.
+        # Align auxiliary branches to speech frames before cross-modal gating.
+        def align(sequence):
+            if sequence.size(1) == e.size(1):
+                return sequence
+            return nn.functional.interpolate(sequence.transpose(1, 2), size=e.size(1),
+                                               mode="linear", align_corners=False).transpose(1, 2)
+
+        h = self.fusion(e, align(m), align(s))
         z = self.cde(h)
         out = self.classifier(z)
         return out 
