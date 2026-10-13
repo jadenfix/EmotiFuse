@@ -116,8 +116,7 @@ cd emotifuse
 poetry install        # or: pip install -e .
 
 from emotifuse import EmotiFuse, infer
-model = EmotiFuse("checkpoints/")
-print(infer("audio/happy.wav"))
+print(infer("audio/happy.wav", checkpoint="checkpoints/emotifuse_epoch01.pt"))
 
 
 ⸻
@@ -157,3 +156,20 @@ repository does not bundle trained emotion-classification weights. The default
 full model also needs the pretrained `facebook/wav2vec2-base` encoder available
 locally or via Hugging Face. Previously created checkpoints may need retraining
 after corrections to spectrogram processing and CDE gradient flow.
+
+
+### Checkpoint and numerical contract
+
+The file-based `infer` helper loads the default EmotiFuse architecture and its
+eight fixed labels; a bare state dict from a different architecture must be
+loaded into an explicitly matching model instead. Replacing a checkpoint at the
+same path invalidates the cache. Incomplete, incompatible or changing files
+raise without replacing a previously loaded model.
+
+Inference rejects non-finite logits or probabilities instead of assigning an
+emotion label to invalid numerical output. The acoustic training fixture tests
+one bounded synthetic train/save/restore/infer workflow with a tiny local
+encoder and a small initial CDE vector field. It does not establish stability
+for arbitrary checkpoints or emotion-recognition accuracy. Trained weights,
+class ordering and acoustic preprocessing must be validated together before
+using predictions.
