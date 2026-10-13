@@ -111,6 +111,8 @@ def test_failed_checkpoint_switch_preserves_cached_model(tmp_path, monkeypatch, 
     monkeypatch.setattr(module.torch, "load", load)
     a = tmp_path / "a.pt"
     b = tmp_path / "b.pt"
+    a.write_bytes(b"fixture a")
+    b.write_bytes(b"fixture b")
     original = module._load_model(str(a))
     with pytest.raises((OSError, RuntimeError)):
         module._load_model(str(b))
