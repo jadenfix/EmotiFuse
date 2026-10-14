@@ -1,0 +1,41 @@
+name: CPU acoustic and checkpoint computation
+
+on:
+  push:
+    branches: [python]
+  pull_request:
+    branches: [python]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  computation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      HF_HUB_OFFLINE: '1'
+      HF_DATASETS_OFFLINE: '1'
+      OMP_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+      CUDA_VISIBLE_DEVICES: ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-cpu-test.txt
+      - name: Install CPU tensor libraries
+        run: python -m pip install torch==2.9.0 torchaudio==2.9.0 --index-url https://download.pytorch.org/whl/cpu
+      - name: Install tested acoustic dependencies
+        run: python -m pip install -r requirements-cpu-test.txt
+      - name: Verify dependency consistency
+        run: python -m pip check
+      - name: Exercise acoustic training, restore, cache and numerical guards
+        run: python -m pytest -q tests
+      - name: Record scope
+        run: |
+          echo 'Synthetic audio and tiny randomly initialized local encoders exercise real tensors, optimizer updates and checkpoints.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'The bounded acoustic fixture scales the initial CDE field and uses zero loader workers. This checks computation and guards, not trained emotion accuracy or arbitrary-checkpoint stability.' >> "$GITHUB_STEP_SUMMARY"
