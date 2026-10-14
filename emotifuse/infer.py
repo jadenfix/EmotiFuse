@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from threading import RLock
 
 import numpy as np
 import soundfile as sf
@@ -20,21 +21,34 @@ __all__ = [
 
 _model: EmotiFuse | None = None
 _checkpoint: str | None = None
+_checkpoint_fingerprint: tuple | None = None
+_cache_lock = RLock()
 _device = get_default_device()
 
 
-def _load_model(checkpoint: str | None = None) -> EmotiFuse:  # pragma: no cover
-    global _model, _checkpoint
+def _file_fingerprint(path: str) -> tuple:
+    stat = Path(path).stat()
+    return (stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
+
+
+def _load_model(checkpoint: str | None = None) -> EmotiFuse:
+    global _model, _checkpoint, _checkpoint_fingerprint
     if checkpoint is None:
         raise ValueError("A trained EmotiFuse checkpoint is required for emotion prediction")
     resolved = str(Path(checkpoint).resolve())
-    if _model is None or _checkpoint != resolved:
-        # Publish a new cache entry only after the checkpoint loads completely.
-        state = torch.load(resolved, map_location=_device, weights_only=True)
-        candidate = EmotiFuse().to(_device).eval()
-        candidate.load_state_dict(state)
-        _model, _checkpoint = candidate, resolved
-    return _model
+    with _cache_lock:
+        fingerprint = _file_fingerprint(resolved)
+        if (_model is None or _checkpoint != resolved
+                or _checkpoint_fingerprint != fingerprint):
+            # Publish only a fully loaded, unchanged file. Replacement files
+            # at the same path invalidate the cache; failed loads preserve it.
+            state = torch.load(resolved, map_location=_device, weights_only=True)
+            candidate = EmotiFuse().to(_device).eval()
+            candidate.load_state_dict(state)
+            if _file_fingerprint(resolved) != fingerprint:
+                raise RuntimeError("Checkpoint changed while loading; retry with a stable file")
+            _model, _checkpoint, _checkpoint_fingerprint = candidate, resolved, fingerprint
+        return _model
 
 
 def infer(wav_path: str | Path, checkpoint: str | None = None) -> str:  # noqa: D401
@@ -69,7 +83,14 @@ def infer(wav_path: str | Path, checkpoint: str | None = None) -> str:  # noqa: 
     model = _load_model(checkpoint)
     with torch.no_grad():
         logits = model(wavs=wav.unsqueeze(0), feats=feats, specs=spec)
-        pred = logits.softmax(dim=-1).argmax(dim=-1).item()
+        if logits.ndim != 2 or logits.shape != (1, 8):
+            raise ValueError("Checkpoint must produce one prediction over the eight emotion labels")
+        if not torch.isfinite(logits).all():
+            raise RuntimeError("Non-finite emotion logits; checkpoint or acoustic inputs require validation")
+        probabilities = logits.softmax(dim=-1)
+        if not torch.isfinite(probabilities).all():
+            raise RuntimeError("Non-finite emotion probabilities; refusing an invalid prediction")
+        pred = probabilities.argmax(dim=-1).item()
 
     # Map to label names (placeholder)
     idx2label = {
